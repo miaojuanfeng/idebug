@@ -13,9 +13,9 @@ dnl [  --with-idebug             Include idebug support])
 
 dnl Otherwise use enable:
 
-PHP_ARG_ENABLE(idebug, whether to enable idebug support,
-Make sure that the comment is aligned:
-[  --enable-idebug           Enable idebug support])
+dnl PHP_ARG_ENABLE(idebug, whether to enable idebug support,
+dnl Make sure that the comment is aligned:
+dnl [  --enable-idebug           Enable idebug support])
 
 if test "$PHP_IDEBUG" != "no"; then
   dnl Write more examples of tests here...

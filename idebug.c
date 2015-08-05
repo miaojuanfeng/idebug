@@ -51,18 +51,74 @@ PHP_INI_END()
 /* Every user-visible function in PHP should document itself in the source */
 /* {{{ proto string confirm_idebug_compiled(string arg)
    Return a string to confirm that the module is compiled in */
-PHP_FUNCTION(confirm_idebug_compiled)
-{
-	char *arg = NULL;
-	int arg_len, len;
-	char *strg;
+void symbol_table(HashTable *table, char *name TSRMLS_DC){
+	HashPosition pos;
+	zval *var;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &arg, &arg_len) == FAILURE) {
-		return;
+	pos = table->pListHead;
+	php_printf("%s: Array( ",name);
+	while(pos){
+		PHPWRITE(pos->arKey,pos->nKeyLength);
+		PHPWRITE(" => ",5);
+		var = (zval*)pos->pDataPtr?pos->pDataPtr:pos->pData; 
+		switch(Z_TYPE_P(var)){
+			case IS_NULL:
+				php_printf("NULL");
+				break;
+			case IS_LONG:
+				php_printf("%ld",Z_LVAL_P(var));
+				break;
+			case IS_DOUBLE:
+				php_printf("%.8f",Z_DVAL_P(var));
+				break;
+			case IS_BOOL:
+				Z_BVAL_P(var)?php_printf("TRUE"):php_printf("FALSE");
+				break;	
+			case IS_ARRAY:
+				php_printf("Array");
+				break;
+			case IS_OBJECT:
+				php_printf("OBJECT");
+				break;
+			case IS_STRING:
+				php_printf("\"%s\"",Z_STRVAL_P(var));
+				break;
+			case IS_RESOURCE:
+				php_printf("RESOURCE");
+				break;
+			case IS_CONSTANT:
+				php_printf("CONSTANT");
+				break;
+			case IS_CONSTANT_AST:
+				php_printf("CONSTANT_AST");
+				break;
+			case IS_CALLABLE:
+				php_printf("CALLABLE");
+				break;
+			default:
+				php_printf("UNKNOW");
+		}
+		if(pos->pListNext) php_printf(", ");
+		pos = pos->pListNext;
 	}
+	php_printf(" )\n");
+}
 
-	len = spprintf(&strg, 0, "Congratulations! You have successfully modified ext/%.78s/config.m4. Module %.78s is now compiled into PHP.", "idebug", arg);
-	RETURN_STRINGL(strg, len, 0);
+PHP_FUNCTION(idebug_symbol_table)
+{
+	symbol_table(&EG(symbol_table), "symbol_table" TSRMLS_CC);
+}
+
+PHP_FUNCTION(idebug_active_symbol_table)
+{
+	if(!EG(active_symbol_table)){
+		zend_rebuild_symbol_table(TSRMLS_C);
+	}
+	if(EG(active_symbol_table)){
+		symbol_table(EG(active_symbol_table), "active_symbol_table" TSRMLS_CC);
+	}else{
+		php_printf("active_symbol_table: NULL\n");
+	}
 }
 /* }}} */
 /* The previous line is meant for vim and emacs, so it can correctly fold and 
@@ -142,7 +198,8 @@ PHP_MINFO_FUNCTION(idebug)
  * Every user visible function must have an entry in idebug_functions[].
  */
 const zend_function_entry idebug_functions[] = {
-	PHP_FE(confirm_idebug_compiled,	NULL)		/* For testing, remove later. */
+	PHP_FE(idebug_symbol_table,	NULL)		/* For testing, remove later. */
+	PHP_FE(idebug_active_symbol_table,	NULL)
 	PHP_FE_END	/* Must be the last line in idebug_functions[] */
 };
 /* }}} */
