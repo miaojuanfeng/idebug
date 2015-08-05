@@ -51,15 +51,15 @@ PHP_INI_END()
 /* Every user-visible function in PHP should document itself in the source */
 /* {{{ proto string confirm_idebug_compiled(string arg)
    Return a string to confirm that the module is compiled in */
-void symbol_table(HashTable *table, char *name TSRMLS_DC){
+void hash_table_key_value(HashTable *table, char *name TSRMLS_DC){
 	HashPosition pos;
 	zval *var;
 
 	pos = table->pListHead;
 	php_printf("%s: Array( ",name);
 	while(pos){
-		PHPWRITE(pos->arKey,pos->nKeyLength);
-		PHPWRITE(" => ",5);
+		php_printf("'%s'",pos->arKey);
+		php_printf(" => ");
 		var = (zval*)pos->pDataPtr?pos->pDataPtr:pos->pData; 
 		switch(Z_TYPE_P(var)){
 			case IS_NULL:
@@ -81,7 +81,7 @@ void symbol_table(HashTable *table, char *name TSRMLS_DC){
 				php_printf("OBJECT");
 				break;
 			case IS_STRING:
-				php_printf("\"%s\"",Z_STRVAL_P(var));
+				php_printf("'%s'",Z_STRVAL_P(var));
 				break;
 			case IS_RESOURCE:
 				php_printf("RESOURCE");
@@ -104,9 +104,22 @@ void symbol_table(HashTable *table, char *name TSRMLS_DC){
 	php_printf(" )\n");
 }
 
+void hash_table_key(HashTable *table, char *name TSRMLS_DC){
+	HashPosition pos;
+
+	pos = table->pListHead;
+	php_printf("%s: Array( ",name);
+	while(pos){
+		php_printf("'%s'",pos->arKey);
+		if(pos->pListNext) php_printf(", ");
+		pos = pos->pListNext;
+	}
+	php_printf(" )\n");
+}
+
 PHP_FUNCTION(idebug_symbol_table)
 {
-	symbol_table(&EG(symbol_table), "symbol_table" TSRMLS_CC);
+	hash_table_key_value(&EG(symbol_table), "symbol_table" TSRMLS_CC);
 }
 
 PHP_FUNCTION(idebug_active_symbol_table)
@@ -115,9 +128,36 @@ PHP_FUNCTION(idebug_active_symbol_table)
 		zend_rebuild_symbol_table(TSRMLS_C);
 	}
 	if(EG(active_symbol_table)){
-		symbol_table(EG(active_symbol_table), "active_symbol_table" TSRMLS_CC);
+		hash_table_key_value(EG(active_symbol_table), "active_symbol_table" TSRMLS_CC);
 	}else{
 		php_printf("active_symbol_table: NULL\n");
+	}
+}
+
+PHP_FUNCTION(idebug_function_table)
+{
+	if(EG(function_table)){
+		hash_table_key(EG(function_table), "function_table" TSRMLS_CC);
+	}else{
+		php_printf("function_table: NULL\n");
+	}
+}
+
+PHP_FUNCTION(idebug_class_table)
+{
+	if(EG(class_table)){
+		hash_table_key(EG(class_table), "class_table" TSRMLS_CC);
+	}else{
+		php_printf("class_table: NULL\n");
+	}
+}
+
+PHP_FUNCTION(idebug_constant_table)
+{
+	if(EG(zend_constants)){
+		hash_table_key_value(EG(zend_constants), "constant_table" TSRMLS_CC);
+	}else{
+		php_printf("constant_table: NULL\n");
 	}
 }
 /* }}} */
@@ -200,6 +240,9 @@ PHP_MINFO_FUNCTION(idebug)
 const zend_function_entry idebug_functions[] = {
 	PHP_FE(idebug_symbol_table,	NULL)		/* For testing, remove later. */
 	PHP_FE(idebug_active_symbol_table,	NULL)
+	PHP_FE(idebug_function_table,	NULL)
+	PHP_FE(idebug_class_table,	NULL)
+	PHP_FE(idebug_constant_table,	NULL)
 	PHP_FE_END	/* Must be the last line in idebug_functions[] */
 };
 /* }}} */
