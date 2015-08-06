@@ -160,6 +160,41 @@ PHP_FUNCTION(idebug_constant_table)
 		php_printf("constant_table: NULL\n");
 	}
 }
+
+PHP_FUNCTION(idebug_included_files_table)
+{
+	hash_table_key(&EG(included_files), "included_files_table" TSRMLS_CC);
+	/* just test : pData point to a integer which value is 1
+	HashPosition pos;
+	pos = EG(included_files).pListHead;
+	php_printf("included_files_table: Array( ");
+	while(pos){
+		php_printf("'%s'",pos->arKey);
+		php_printf(" => %d",*(int*)pos->pData);
+		if(pos->pListNext) php_printf(", ");
+		pos = pos->pListNext;
+	}
+	php_printf(" )\n");*/
+}
+
+PHP_FUNCTION(idebug_function_stack)
+{
+	/*void **p;
+	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
+	zend_execute_data *cx = EG(current_execute_data);
+	p = ex->function_state.arguments;
+	php_printf("current function_name:%s\n",cx->function_state.function->common.function_name);
+	php_printf("prev function_name:%s\n",ex->function_state.function->common.function_name);
+	php_printf("num_args:%d\n",(int)(zend_uintptr_t)*p);*/
+	zend_execute_data *ex = EG(current_execute_data);
+	php_printf("function_stack: Stack( ");
+	while(ex){
+		php_printf("'%s'",ex->function_state.function->common.function_name);
+		if(ex->prev_execute_data) php_printf(" => ");
+		ex = ex->prev_execute_data;
+	}
+	php_printf(" )\n");
+}
 /* }}} */
 /* The previous line is meant for vim and emacs, so it can correctly fold and 
    unfold functions in source code. See the corresponding marks just before 
@@ -243,6 +278,8 @@ const zend_function_entry idebug_functions[] = {
 	PHP_FE(idebug_function_table,	NULL)
 	PHP_FE(idebug_class_table,	NULL)
 	PHP_FE(idebug_constant_table,	NULL)
+	PHP_FE(idebug_included_files_table,	NULL)
+	PHP_FE(idebug_function_stack, NULL)
 	PHP_FE_END	/* Must be the last line in idebug_functions[] */
 };
 /* }}} */
