@@ -177,7 +177,7 @@ PHP_FUNCTION(idebug_included_files_table)
 	php_printf(" )\n");*/
 }
 
-PHP_FUNCTION(idebug_function_stack)
+PHP_FUNCTION(idebug_function_call_stack)
 {
 	/*void **p;
 	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
@@ -186,12 +186,89 @@ PHP_FUNCTION(idebug_function_stack)
 	php_printf("current function_name:%s\n",cx->function_state.function->common.function_name);
 	php_printf("prev function_name:%s\n",ex->function_state.function->common.function_name);
 	php_printf("num_args:%d\n",(int)(zend_uintptr_t)*p);*/
-	zend_execute_data *ex = EG(current_execute_data);
-	php_printf("function_stack: Stack( ");
+	typedef struct _idebug_data_stack
+	{
+		void *data;
+		struct _idebug_data_stack *next;
+	}idebug_data_stack;
+
+	idebug_data_stack *p = NULL, *q = NULL;
+	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
+
 	while(ex){
-		php_printf("'%s'",ex->function_state.function->common.function_name);
-		if(ex->prev_execute_data) php_printf(" => ");
+		p = emalloc(sizeof(idebug_data_stack));
+		p->data = (void*)ex;
+		p->next = q;
+		q = p;
 		ex = ex->prev_execute_data;
+	}
+	php_printf("function_stack: Stack( ");
+	while(p){
+		q = p;
+		php_printf("'%s'",((zend_execute_data*)p->data)->function_state.function->common.function_name);
+		if(p->next) php_printf(" => ");
+		p= p->next;
+		efree(q);
+	}
+	php_printf(" )\n");
+}
+
+PHP_FUNCTION(idebug_function_args)
+{
+	void **p;
+	int num_args = 0;
+	int i;
+	zval *arg;
+	zend_execute_data *ex;
+
+	if(EG(current_execute_data)->prev_execute_data){
+		ex = EG(current_execute_data)->prev_execute_data;
+
+		p = ex->function_state.arguments;
+		num_args = (int)(zend_uintptr_t)*p;
+	}
+
+	php_printf("function_args: Args( ");
+	while(num_args>0){
+		arg = *(zval**)(p-num_args);
+		switch(Z_TYPE_P(arg)){
+			case IS_NULL:
+				php_printf("NULL");
+				break;
+			case IS_LONG:
+				php_printf("%ld",Z_LVAL_P(arg));
+				break;
+			case IS_DOUBLE:
+				php_printf("%.8f",Z_DVAL_P(arg));
+				break;
+			case IS_BOOL:
+				Z_BVAL_P(arg)?php_printf("TRUE"):php_printf("FALSE");
+				break;	
+			case IS_ARRAY:
+				php_printf("Array");
+				break;
+			case IS_OBJECT:
+				php_printf("OBJECT");
+				break;
+			case IS_STRING:
+				php_printf("'%s'",Z_STRVAL_P(arg));
+				break;
+			case IS_RESOURCE:
+				php_printf("RESOURCE");
+				break;
+			case IS_CONSTANT:
+				php_printf("CONSTANT");
+				break;
+			case IS_CONSTANT_AST:
+				php_printf("CONSTANT_AST");
+				break;
+			case IS_CALLABLE:
+				php_printf("CALLABLE");
+				break;
+			default:
+				php_printf("UNKNOW");
+		}
+		if(--num_args>0) php_printf(" , ");
 	}
 	php_printf(" )\n");
 }
@@ -279,7 +356,8 @@ const zend_function_entry idebug_functions[] = {
 	PHP_FE(idebug_class_table,	NULL)
 	PHP_FE(idebug_constant_table,	NULL)
 	PHP_FE(idebug_included_files_table,	NULL)
-	PHP_FE(idebug_function_stack, NULL)
+	PHP_FE(idebug_function_call_stack, NULL)
+	PHP_FE(idebug_function_args, NULL)
 	PHP_FE_END	/* Must be the last line in idebug_functions[] */
 };
 /* }}} */
