@@ -161,7 +161,7 @@ PHP_FUNCTION(idebug_constant_table)
 	}
 }
 
-PHP_FUNCTION(idebug_included_files_table)
+PHP_FUNCTION(idebug_included_files)
 {
 	hash_table_key(&EG(included_files), "included_files_table" TSRMLS_CC);
 	/* just test : pData point to a integer which value is 1
@@ -355,7 +355,7 @@ const zend_function_entry idebug_functions[] = {
 	PHP_FE(idebug_function_table,	NULL)
 	PHP_FE(idebug_class_table,	NULL)
 	PHP_FE(idebug_constant_table,	NULL)
-	PHP_FE(idebug_included_files_table,	NULL)
+	PHP_FE(idebug_included_files,	NULL)
 	PHP_FE(idebug_function_call_stack, NULL)
 	PHP_FE(idebug_function_args, NULL)
 	PHP_FE_END	/* Must be the last line in idebug_functions[] */
