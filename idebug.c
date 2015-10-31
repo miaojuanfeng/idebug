@@ -229,8 +229,8 @@ PHP_FUNCTION(idebug_function_args)
 	}
 
 	php_printf("function_args: Args( ");
-	while(num_args>0){
-		arg = *(zval**)(p-num_args);
+	while( num_args > 0 ){
+		arg = *(zval**)( p - num_args );
 		switch(Z_TYPE_P(arg)){
 			case IS_NULL:
 				php_printf("NULL");
