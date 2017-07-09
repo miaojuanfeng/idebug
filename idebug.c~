@@ -77,7 +77,7 @@ void hash_table_key_value(HashTable *table, char *name TSRMLS_DC){
 				Z_BVAL_P(var) ? php_printf("bool(true)") : php_printf("bool(false)");
 				break;	
 			case IS_ARRAY:
-				php_printf("Array(%d) {", Z_ARRVAL_P(var)->nNumOfElements);
+				php_printf("Array(%s) {", Z_ARRVAL_P(var)->nNumOfElements);
 				hash_table_key_value(Z_ARRVAL_P(var), NULL);
 				//php_printf(")");				
 				break;
