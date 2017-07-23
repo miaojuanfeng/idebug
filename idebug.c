@@ -276,6 +276,104 @@ PHP_FUNCTION(idebug_function_args)
 	}
 	php_printf(" )\n");
 }
+
+PHP_FUNCTION(idebug_func)
+{
+	zval *inc_filename;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &inc_filename) == FAILURE) {
+		return;
+	}
+
+	php_printf("%d\n", EG(function_table)->nNumOfElements);
+
+	zend_file_handle file_handle;
+	char *resolved_path;
+	zend_op_array *new_op_array=NULL;
+	zend_bool failure_retval = 0;
+	resolved_path = zend_resolve_path(Z_STRVAL_P(inc_filename), Z_STRLEN_P(inc_filename) TSRMLS_CC);
+	if (resolved_path) {
+		failure_retval = zend_hash_exists(&EG(included_files), resolved_path, strlen(resolved_path)+1);
+	} else {
+		resolved_path = Z_STRVAL_P(inc_filename);
+	}
+	if (failure_retval) {
+		// do nothing, file already included
+	} else if (SUCCESS == zend_stream_open(resolved_path, &file_handle TSRMLS_CC)) {
+		if (!file_handle.opened_path) {
+			file_handle.opened_path = estrdup(resolved_path);
+		}
+		if (zend_hash_add_empty_element(&EG(included_files), file_handle.opened_path, strlen(file_handle.opened_path)+1)==SUCCESS) {
+			new_op_array = zend_compile_file(&file_handle, ZEND_INCLUDE TSRMLS_CC);
+			zend_destroy_file_handle(&file_handle TSRMLS_CC);
+		} else {
+			zend_file_handle_dtor(&file_handle TSRMLS_CC);
+			failure_retval=1;
+		}
+	} else {
+		zend_message_dispatcher(ZMSG_FAILED_INCLUDE_FOPEN, Z_STRVAL_P(inc_filename) TSRMLS_CC);
+	}
+	if (resolved_path != Z_STRVAL_P(inc_filename)) {
+		efree(resolved_path);
+	}
+
+	if (EXPECTED(new_op_array != NULL)) {
+		destroy_op_array(new_op_array TSRMLS_CC);
+		efree(new_op_array);
+	}
+
+	php_printf("%d\n", EG(function_table)->nNumOfElements);
+
+	zval *retval;
+	MAKE_STD_ZVAL(retval);
+	array_init(retval);
+
+	zend_function *func = (zend_function *)EG(function_table)->pListTail->pData;
+	if( func->type == ZEND_USER_FUNCTION ){
+		// func_obj
+		zval *func_obj;
+		MAKE_STD_ZVAL(func_obj);
+		object_init(func_obj);
+		// function_name
+		zend_update_property_string(NULL, func_obj, "function_name", 13, func->common.function_name TSRMLS_CC);
+		// num_args
+		zend_update_property_long(NULL, func_obj, "num_args", 8, func->common.num_args TSRMLS_CC);
+		// required_num_args
+		zend_update_property_long(NULL, func_obj, "required_num_args", 17, func->common.required_num_args TSRMLS_CC);
+		// arg_info
+		int i;
+		zval *arg_arr;
+		MAKE_STD_ZVAL(arg_arr);
+		array_init(arg_arr);
+		for(i=0;i<func->common.num_args;i++){
+			zval *arg_info;
+			MAKE_STD_ZVAL(arg_info);
+			object_init(arg_info);
+			zend_update_property_string(NULL, arg_info, "name", 4, func->common.arg_info[i].name TSRMLS_CC);
+			zend_hash_index_update(Z_ARRVAL_P(arg_arr), i, &arg_info, sizeof(zval *), NULL);
+		}
+		zend_update_property(NULL, func_obj, "arg_info", 8, arg_arr TSRMLS_CC);
+		zval_ptr_dtor(&arg_arr);
+		//
+		zend_hash_index_update(Z_ARRVAL_P(retval), 0, &func_obj, sizeof(zval *), NULL);
+		
+		/*const char *func_name = func->common.function_name;
+		zend_uint num_args = func->common.num_args;
+		zend_uint required_num_args = func->common.required_num_args;
+		php_printf("function_name: %s\n", func_name);
+		php_printf("num_args: %d\n", num_args);
+		php_printf("required_num_args: %d\n", required_num_args);
+
+		for(i=0;i<num_args;i++){
+			php_printf("arg_info: %s\n", func->common.arg_info[i].name);
+		}
+		for(i=0;i<func->op_array.last;i++){
+			zend_op *op = &func->op_array.opcodes[i];
+			php_printf("%d\n", op->opcode);
+		}*/
+	}
+	RETURN_ZVAL(retval, 0 , 1);
+}
 /* }}} */
 /* The previous line is meant for vim and emacs, so it can correctly fold and 
    unfold functions in source code. See the corresponding marks just before 
@@ -362,6 +460,7 @@ const zend_function_entry idebug_functions[] = {
 	PHP_FE(idebug_included_files,	NULL)
 	PHP_FE(idebug_function_call_stack, NULL)
 	PHP_FE(idebug_function_args, NULL)
+	PHP_FE(idebug_func, NULL)
 	PHP_FE_END	/* Must be the last line in idebug_functions[] */
 };
 /* }}} */
