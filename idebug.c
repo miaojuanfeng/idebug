@@ -286,8 +286,8 @@ PHP_FUNCTION(idebug_compile_file)
 	}
 
 	Bucket *func_bucket_start = EG(function_table)->pListTail;
-	Bucket *symbol_bucket_start = EG(zend_constants)->pListHead;
-	php_printf("%d\n", EG(zend_constants)->nNumOfElements);
+	// Bucket *symbol_bucket_start = EG(zend_constants)->pListHead;
+	// php_printf("%d\n", EG(zend_constants)->nNumOfElements);
 
 	zend_file_handle file_handle;
 	char *resolved_path;
@@ -319,14 +319,15 @@ PHP_FUNCTION(idebug_compile_file)
 		efree(resolved_path);
 	}
 
-	if (EXPECTED(new_op_array != NULL)) {
-		destroy_op_array(new_op_array TSRMLS_CC);
-		efree(new_op_array);
+	int j;
+	for(j=0;j<new_op_array->last;j++){
+		zend_op *op = &new_op_array->opcodes[j];
+		php_printf("%d\n", op->opcode);
 	}
 
 	Bucket *func_bucket_end = EG(function_table)->pListTail;
-	Bucket *symbol_bucket_end = EG(zend_constants)->pListTail;
-	php_printf("%d\n", EG(zend_constants)->nNumOfElements);
+	// Bucket *symbol_bucket_end = EG(zend_constants)->pListTail;
+	// php_printf("%d\n", EG(zend_constants)->nNumOfElements);
 
 	zval *retval;
 	MAKE_STD_ZVAL(retval);
@@ -393,26 +394,29 @@ PHP_FUNCTION(idebug_compile_file)
 		zend_hash_update(Z_ARRVAL_P(retval), "function", 9, &func_arr, sizeof(zval *), NULL);
 	}
 
-	if( symbol_bucket_start != symbol_bucket_end ){
-		zend_uint index = 0;
-		Bucket *p = symbol_bucket_start;
+	// if( symbol_bucket_start != symbol_bucket_end ){
+	// 	zend_uint index = 0;
+	// 	Bucket *p = symbol_bucket_start;
 
-		zval *symbol_arr;
-		MAKE_STD_ZVAL(symbol_arr);
-		array_init(symbol_arr);
-		do{
-			p = p->pListNext;
-			zval *symbol;
-			MAKE_STD_ZVAL(symbol);
-			ZVAL_STRING(symbol, p->arKey, 1);
-			//
-			zend_hash_index_update(Z_ARRVAL_P(symbol_arr), index, &symbol, sizeof(zval *), NULL);
-			index++;
-		}while( p != symbol_bucket_end );
+	// 	zval *symbol_arr;
+	// 	MAKE_STD_ZVAL(symbol_arr);
+	// 	array_init(symbol_arr);
+	// 	do{
+	// 		p = p->pListNext;
+	// 		zval *symbol;
+	// 		MAKE_STD_ZVAL(symbol);
+	// 		ZVAL_STRING(symbol, p->arKey, 1);
+	// 		//
+	// 		zend_hash_index_update(Z_ARRVAL_P(symbol_arr), index, &symbol, sizeof(zval *), NULL);
+	// 		index++;
+	// 	}while( p != symbol_bucket_end );
 
-		zend_hash_update(Z_ARRVAL_P(retval), "symbol", 7, &symbol_arr, sizeof(zval *), NULL);
-	}else{
-		RETURN_TRUE;
+	// 	zend_hash_update(Z_ARRVAL_P(retval), "symbol", 7, &symbol_arr, sizeof(zval *), NULL);
+	// }
+
+	if (EXPECTED(new_op_array != NULL)) {
+		destroy_op_array(new_op_array TSRMLS_CC);
+		efree(new_op_array);
 	}
 
 	RETURN_ZVAL(retval, 0 , 1);
