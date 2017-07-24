@@ -277,7 +277,7 @@ PHP_FUNCTION(idebug_function_args)
 	php_printf(" )\n");
 }
 
-PHP_FUNCTION(idebug_func)
+PHP_FUNCTION(idebug_compile_file)
 {
 	zval *inc_filename;
 
@@ -285,7 +285,9 @@ PHP_FUNCTION(idebug_func)
 		return;
 	}
 
-	php_printf("%d\n", EG(function_table)->nNumOfElements);
+	Bucket *func_bucket_start = EG(function_table)->pListTail;
+	Bucket *symbol_bucket_start = EG(zend_constants)->pListHead;
+	php_printf("%d\n", EG(zend_constants)->nNumOfElements);
 
 	zend_file_handle file_handle;
 	char *resolved_path;
@@ -322,56 +324,97 @@ PHP_FUNCTION(idebug_func)
 		efree(new_op_array);
 	}
 
-	php_printf("%d\n", EG(function_table)->nNumOfElements);
+	Bucket *func_bucket_end = EG(function_table)->pListTail;
+	Bucket *symbol_bucket_end = EG(zend_constants)->pListTail;
+	php_printf("%d\n", EG(zend_constants)->nNumOfElements);
 
 	zval *retval;
 	MAKE_STD_ZVAL(retval);
 	array_init(retval);
 
-	zend_function *func = (zend_function *)EG(function_table)->pListTail->pData;
-	if( func->type == ZEND_USER_FUNCTION ){
-		// func_obj
-		zval *func_obj;
-		MAKE_STD_ZVAL(func_obj);
-		object_init(func_obj);
-		// function_name
-		zend_update_property_string(NULL, func_obj, "function_name", 13, func->common.function_name TSRMLS_CC);
-		// num_args
-		zend_update_property_long(NULL, func_obj, "num_args", 8, func->common.num_args TSRMLS_CC);
-		// required_num_args
-		zend_update_property_long(NULL, func_obj, "required_num_args", 17, func->common.required_num_args TSRMLS_CC);
-		// arg_info
-		int i;
-		zval *arg_arr;
-		MAKE_STD_ZVAL(arg_arr);
-		array_init(arg_arr);
-		for(i=0;i<func->common.num_args;i++){
-			zval *arg_info;
-			MAKE_STD_ZVAL(arg_info);
-			object_init(arg_info);
-			zend_update_property_string(NULL, arg_info, "name", 4, func->common.arg_info[i].name TSRMLS_CC);
-			zend_hash_index_update(Z_ARRVAL_P(arg_arr), i, &arg_info, sizeof(zval *), NULL);
-		}
-		zend_update_property(NULL, func_obj, "arg_info", 8, arg_arr TSRMLS_CC);
-		zval_ptr_dtor(&arg_arr);
-		//
-		zend_hash_index_update(Z_ARRVAL_P(retval), 0, &func_obj, sizeof(zval *), NULL);
-		
-		/*const char *func_name = func->common.function_name;
-		zend_uint num_args = func->common.num_args;
-		zend_uint required_num_args = func->common.required_num_args;
-		php_printf("function_name: %s\n", func_name);
-		php_printf("num_args: %d\n", num_args);
-		php_printf("required_num_args: %d\n", required_num_args);
+	if( func_bucket_start != func_bucket_end ){
+		zend_uint index = 0;
+		Bucket *p = func_bucket_start;
 
-		for(i=0;i<num_args;i++){
-			php_printf("arg_info: %s\n", func->common.arg_info[i].name);
-		}
-		for(i=0;i<func->op_array.last;i++){
-			zend_op *op = &func->op_array.opcodes[i];
-			php_printf("%d\n", op->opcode);
-		}*/
+		zval *func_arr;
+		MAKE_STD_ZVAL(func_arr);
+		array_init(func_arr);
+		do{
+			p = p->pListNext;
+			zend_function *func = (zend_function *)p->pData;
+			if( func->type == ZEND_USER_FUNCTION ){
+				// func_obj
+				zval *func_obj;
+				MAKE_STD_ZVAL(func_obj);
+				object_init(func_obj);
+				// function_name
+				zend_update_property_string(NULL, func_obj, "function_name", 13, func->common.function_name TSRMLS_CC);
+				// type
+				zend_update_property_string(NULL, func_obj, "type", 4, "ZEND_USER_FUNCTION" TSRMLS_CC);
+				// num_args
+				zend_update_property_long(NULL, func_obj, "num_args", 8, func->common.num_args TSRMLS_CC);
+				// required_num_args
+				zend_update_property_long(NULL, func_obj, "required_num_args", 17, func->common.required_num_args TSRMLS_CC);
+				// arg_info
+				int i;
+				zval *arg_arr;
+				MAKE_STD_ZVAL(arg_arr);
+				array_init(arg_arr);
+				for(i=0;i<func->common.num_args;i++){
+					zval *arg_info;
+					MAKE_STD_ZVAL(arg_info);
+					object_init(arg_info);
+					zend_update_property_string(NULL, arg_info, "name", 4, func->common.arg_info[i].name TSRMLS_CC);
+					zend_update_property_long(NULL, arg_info, "name_len", 8, func->common.arg_info[i].name_len TSRMLS_CC);
+					if( func->common.arg_info[i].class_name_len ){
+						zend_update_property_string(NULL, arg_info, "class_name", 10, func->common.arg_info[i].class_name TSRMLS_CC);
+					}else{
+						/*
+						*	之所以不赋值为空字符串，是因为指针不是指向一个空的字符串，而是为空
+						*/
+						zend_update_property_null(NULL, arg_info, "class_name", 10 TSRMLS_CC);
+					}
+					zend_update_property_long(NULL, arg_info, "class_name_len", 14, func->common.arg_info[i].class_name_len TSRMLS_CC);
+					zend_update_property_bool(NULL, arg_info, "type_hint", 9, func->common.arg_info[i].type_hint TSRMLS_CC);
+					zend_update_property_bool(NULL, arg_info, "pass_by_reference", 17, func->common.arg_info[i].pass_by_reference TSRMLS_CC);
+					zend_update_property_bool(NULL, arg_info, "allow_null", 10, func->common.arg_info[i].allow_null TSRMLS_CC);
+					zend_update_property_bool(NULL, arg_info, "is_variadic", 11, func->common.arg_info[i].is_variadic TSRMLS_CC);
+					//
+					zend_hash_index_update(Z_ARRVAL_P(arg_arr), i, &arg_info, sizeof(zval *), NULL);
+				}
+				zend_update_property(NULL, func_obj, "arg_info", 8, arg_arr TSRMLS_CC);
+				zval_ptr_dtor(&arg_arr);
+				//
+				zend_hash_index_update(Z_ARRVAL_P(func_arr), index, &func_obj, sizeof(zval *), NULL);
+				index++;
+			}
+		}while( p != func_bucket_end );
+
+		zend_hash_update(Z_ARRVAL_P(retval), "function", 9, &func_arr, sizeof(zval *), NULL);
 	}
+
+	if( symbol_bucket_start != symbol_bucket_end ){
+		zend_uint index = 0;
+		Bucket *p = symbol_bucket_start;
+
+		zval *symbol_arr;
+		MAKE_STD_ZVAL(symbol_arr);
+		array_init(symbol_arr);
+		do{
+			p = p->pListNext;
+			zval *symbol;
+			MAKE_STD_ZVAL(symbol);
+			ZVAL_STRING(symbol, p->arKey, 1);
+			//
+			zend_hash_index_update(Z_ARRVAL_P(symbol_arr), index, &symbol, sizeof(zval *), NULL);
+			index++;
+		}while( p != symbol_bucket_end );
+
+		zend_hash_update(Z_ARRVAL_P(retval), "symbol", 7, &symbol_arr, sizeof(zval *), NULL);
+	}else{
+		RETURN_TRUE;
+	}
+
 	RETURN_ZVAL(retval, 0 , 1);
 }
 /* }}} */
@@ -460,7 +503,7 @@ const zend_function_entry idebug_functions[] = {
 	PHP_FE(idebug_included_files,	NULL)
 	PHP_FE(idebug_function_call_stack, NULL)
 	PHP_FE(idebug_function_args, NULL)
-	PHP_FE(idebug_func, NULL)
+	PHP_FE(idebug_compile_file, NULL)
 	PHP_FE_END	/* Must be the last line in idebug_functions[] */
 };
 /* }}} */
