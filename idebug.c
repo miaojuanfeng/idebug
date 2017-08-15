@@ -51,123 +51,103 @@ PHP_INI_END()
 /* Every user-visible function in PHP should document itself in the source */
 /* {{{ proto string confirm_idebug_compiled(string arg)
    Return a string to confirm that the module is compiled in */
-void hash_table_key_value(HashTable *table, char *name TSRMLS_DC){
+zval* hash_table_key_value(HashTable *table TSRMLS_DC){
 	HashPosition pos;
-	zval *var;
+	zval *value;
+	zval *retval;
 
-	pos = table->pListHead;
-	if( name ){
-		php_printf("%s: Array(%d) { ", name, table->nNumOfElements);
-	}
-	while(pos){
-		php_printf("'%s'",pos->arKey);
-		php_printf(" => ");
-		var = (zval*)pos->pDataPtr?pos->pDataPtr:pos->pData; 
-		switch(Z_TYPE_P(var)){
-			case IS_NULL:
-				php_printf("NULL");
-				break;
-			case IS_LONG:
-				php_printf("int(%ld)", Z_LVAL_P(var));
-				break;
-			case IS_DOUBLE:
-				php_printf("float(%.8f)", Z_DVAL_P(var));
-				break;
-			case IS_BOOL:
-				Z_BVAL_P(var) ? php_printf("bool(true)") : php_printf("bool(false)");
-				break;	
-			case IS_ARRAY:
-				php_printf("Array(%d) {", Z_ARRVAL_P(var)->nNumOfElements);
-				hash_table_key_value(Z_ARRVAL_P(var), NULL);
-				//php_printf(")");				
-				break;
-			case IS_OBJECT:
-				php_printf("OBJECT");
-				break;
-			case IS_STRING:
-				php_printf("string(%d) \"%s\"", Z_STRLEN_P(var), Z_STRVAL_P(var));
-				break;
-			case IS_RESOURCE:
-				php_printf("RESOURCE");
-				break;
-			case IS_CONSTANT:
-				php_printf("CONSTANT");
-				break;
-			case IS_CONSTANT_AST:
-				php_printf("CONSTANT_AST");
-				break;
-			case IS_CALLABLE:
-				php_printf("CALLABLE");
-				break;
-			default:
-				php_printf("UNKNOW");
+	MAKE_STD_ZVAL(retval);
+	array_init(retval);
+	if( table ){
+		pos = table->pListHead;
+		while(pos){
+			value = (zval*)pos->pDataPtr?pos->pDataPtr:pos->pData;
+			switch(Z_TYPE_P(value)){
+				case IS_NULL:
+				case IS_LONG:
+				case IS_DOUBLE:
+				case IS_BOOL:
+				case IS_ARRAY:
+				case IS_OBJECT:
+				case IS_STRING:
+					Z_ADDREF_P(value);
+					zend_hash_update(Z_ARRVAL_P(retval), pos->arKey, pos->nKeyLength+1, &value, sizeof(zval *), NULL);
+					break;
+				case IS_RESOURCE:
+				case IS_CONSTANT:
+				case IS_CONSTANT_AST:
+				case IS_CALLABLE:
+				default:
+					break;
+			}
+			pos = pos->pListNext;
 		}
-		if(pos->pListNext) php_printf(", ");
-		pos = pos->pListNext;
 	}
-	php_printf("}\n");
+	return retval;
 }
 
-void hash_table_key(HashTable *table, char *name TSRMLS_DC){
+zval* hash_table_key(HashTable *table TSRMLS_DC){
 	HashPosition pos;
+	zval *key;
+	zval *retval;
 
-	pos = table->pListHead;
-	php_printf("%s: Array( ",name);
-	while(pos){
-		php_printf("'%s'",pos->arKey);
-		if(pos->pListNext) php_printf(", ");
-		pos = pos->pListNext;
+	MAKE_STD_ZVAL(retval);
+	array_init(retval);
+	if( table ){
+		pos = table->pListHead;
+		while(pos){
+			MAKE_STD_ZVAL(key);
+			ZVAL_STRINGL(key, pos->arKey, pos->nKeyLength, 1);
+			zend_hash_next_index_insert(Z_ARRVAL_P(retval), &key, sizeof(zval *), NULL);
+			pos = pos->pListNext;
+		}
 	}
-	php_printf(" )\n");
+	return retval;
 }
 
 PHP_FUNCTION(idebug_symbol_table)
 {
-	hash_table_key_value(&EG(symbol_table), "symbol_table" TSRMLS_CC);
+	if( return_value_used ){
+		RETURN_ZVAL(hash_table_key_value(&EG(symbol_table) TSRMLS_CC), 0, 1);
+	}
 }
 
 PHP_FUNCTION(idebug_active_symbol_table)
 {
-	if(!EG(active_symbol_table)){
-		zend_rebuild_symbol_table(TSRMLS_C);
-	}
-	if(EG(active_symbol_table)){
-		hash_table_key_value(EG(active_symbol_table), "active_symbol_table" TSRMLS_CC);
-	}else{
-		php_printf("active_symbol_table: NULL\n");
+	if( return_value_used ){
+		if(!EG(active_symbol_table)){
+			zend_rebuild_symbol_table(TSRMLS_C);
+		}
+		RETURN_ZVAL(hash_table_key_value(EG(active_symbol_table) TSRMLS_CC), 0, 1);
 	}
 }
 
 PHP_FUNCTION(idebug_function_table)
 {
-	if(EG(function_table)){
-		hash_table_key(EG(function_table), "function_table" TSRMLS_CC);
-	}else{
-		php_printf("function_table: NULL\n");
+	if( return_value_used ){
+		RETURN_ZVAL(hash_table_key(EG(function_table) TSRMLS_CC), 0, 1);
 	}
 }
 
 PHP_FUNCTION(idebug_class_table)
 {
-	if(EG(class_table)){
-		hash_table_key(EG(class_table), "class_table" TSRMLS_CC);
-	}else{
-		php_printf("class_table: NULL\n");
+	if( return_value_used ){
+		RETURN_ZVAL(hash_table_key(EG(class_table) TSRMLS_CC), 0, 1);
 	}
 }
 
 PHP_FUNCTION(idebug_constant_table)
 {
-	if(EG(zend_constants)){
-		hash_table_key_value(EG(zend_constants), "constant_table" TSRMLS_CC);
-	}else{
-		php_printf("constant_table: NULL\n");
+	if( return_value_used ){
+		RETURN_ZVAL(hash_table_key_value(EG(zend_constants) TSRMLS_CC), 0, 1);
 	}
 }
 
 PHP_FUNCTION(idebug_included_files)
 {
-	hash_table_key(&EG(included_files), "included_files_table" TSRMLS_CC);
+	if( return_value_used ){
+		RETURN_ZVAL(hash_table_key(&EG(included_files) TSRMLS_CC), 0, 1);
+	}
 	/* just test : pData point to a integer which value is 1
 	HashPosition pos;
 	pos = EG(included_files).pListHead;
@@ -183,98 +163,74 @@ PHP_FUNCTION(idebug_included_files)
 
 PHP_FUNCTION(idebug_function_call_stack)
 {
-	/*void **p;
-	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
-	zend_execute_data *cx = EG(current_execute_data);
-	p = ex->function_state.arguments;
-	php_printf("current function_name:%s\n",cx->function_state.function->common.function_name);
-	php_printf("prev function_name:%s\n",ex->function_state.function->common.function_name);
-	php_printf("num_args:%d\n",(int)(zend_uintptr_t)*p);*/
-	typedef struct _idebug_data_stack
-	{
-		void *data;
-		struct _idebug_data_stack *next;
-	}idebug_data_stack;
+	if( return_value_used ){
+		zval *value;
+		zval *retval;
+		/*void **p;
+		zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
+		zend_execute_data *cx = EG(current_execute_data);
+		p = ex->function_state.arguments;
+		php_printf("current function_name:%s\n",cx->function_state.function->common.function_name);
+		php_printf("prev function_name:%s\n",ex->function_state.function->common.function_name);
+		php_printf("num_args:%d\n",(int)(zend_uintptr_t)*p);*/
+		typedef struct _idebug_data_stack
+		{
+			void *data;
+			struct _idebug_data_stack *next;
+		}idebug_data_stack;
 
-	idebug_data_stack *p = NULL, *q = NULL;
-	zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
+		idebug_data_stack *p = NULL, *q = NULL;
+		zend_execute_data *ex = EG(current_execute_data)->prev_execute_data;
 
-	while(ex){
-		p = emalloc(sizeof(idebug_data_stack));
-		p->data = (void*)ex;
-		p->next = q;
-		q = p;
-		ex = ex->prev_execute_data;
+		while(ex){
+			p = emalloc(sizeof(idebug_data_stack));
+			p->data = (void*)ex;
+			p->next = q;
+			q = p;
+			ex = ex->prev_execute_data;
+		}
+		
+		MAKE_STD_ZVAL(retval);
+		array_init(retval);
+		while(p){
+			q = p;
+			MAKE_STD_ZVAL(value);
+			ZVAL_STRING(value, ((zend_execute_data*)p->data)->function_state.function->common.function_name, 1);
+			zend_hash_next_index_insert(Z_ARRVAL_P(retval), &value, sizeof(zval *), NULL);
+			p= p->next;
+			efree(q);
+		}
+		RETURN_ZVAL(retval, 0, 1);
 	}
-	php_printf("function_stack: Stack( ");
-	while(p){
-		q = p;
-		php_printf("'%s'",((zend_execute_data*)p->data)->function_state.function->common.function_name);
-		if(p->next) php_printf(" => ");
-		p= p->next;
-		efree(q);
-	}
-	php_printf(" )\n");
 }
 
 PHP_FUNCTION(idebug_function_args)
 {
-	void **p;
-	int num_args = 0;
-	int i;
-	zval *arg;
-	zend_execute_data *ex;
+	if( return_value_used ){
+		zval* retval;
 
-	if(EG(current_execute_data)->prev_execute_data){
-		ex = EG(current_execute_data)->prev_execute_data;
+		void **p;
+		int num_args = 0;
+		int i;
+		zval *arg;
+		zend_execute_data *ex;
 
-		p = ex->function_state.arguments;
-		num_args = (int)(zend_uintptr_t)*p;
-	}
+		if(EG(current_execute_data)->prev_execute_data){
+			ex = EG(current_execute_data)->prev_execute_data;
 
-	php_printf("function_args: Args( ");
-	while( num_args > 0 ){
-		arg = *(zval**)( p - num_args );
-		switch(Z_TYPE_P(arg)){
-			case IS_NULL:
-				php_printf("NULL");
-				break;
-			case IS_LONG:
-				php_printf("%ld",Z_LVAL_P(arg));
-				break;
-			case IS_DOUBLE:
-				php_printf("%.8f",Z_DVAL_P(arg));
-				break;
-			case IS_BOOL:
-				Z_BVAL_P(arg)?php_printf("TRUE"):php_printf("FALSE");
-				break;	
-			case IS_ARRAY:
-				php_printf("Array");
-				break;
-			case IS_OBJECT:
-				php_printf("OBJECT");
-				break;
-			case IS_STRING:
-				php_printf("'%s'",Z_STRVAL_P(arg));
-				break;
-			case IS_RESOURCE:
-				php_printf("RESOURCE");
-				break;
-			case IS_CONSTANT:
-				php_printf("CONSTANT");
-				break;
-			case IS_CONSTANT_AST:
-				php_printf("CONSTANT_AST");
-				break;
-			case IS_CALLABLE:
-				php_printf("CALLABLE");
-				break;
-			default:
-				php_printf("UNKNOW");
+			p = ex->function_state.arguments;
+			num_args = (int)(zend_uintptr_t)*p;
 		}
-		if(--num_args>0) php_printf(" , ");
+
+		MAKE_STD_ZVAL(retval);
+		array_init(retval);
+		while( num_args > 0 ){
+			arg = *(zval**)( p - num_args );
+			zend_hash_next_index_insert(Z_ARRVAL_P(retval), &arg, sizeof(zval *), NULL);
+			--num_args;
+		}
+		RETURN_ZVAL(retval, 0, 1);
 	}
-	php_printf(" )\n");
 }
 
 PHP_FUNCTION(idebug_compile_file)
