@@ -6,3 +6,7 @@ idebug 是一个帮助 PHP 内核或扩展开发人员的调试工具，可以�
 
 ### 初衷
 开发本工具的目的，是因为在开发 PHP 扩展中经常会遇到段错误，使用 GDB 调试太繁琐，而另一个成熟的内核调试工具 xdebug 没有我需要的功能，自己编写一个调试工具不仅满足了自身需要，还可以更加了解 PHP 内核数据结构与算法。
+
+### Document
+
+[idebug - PHP内核调试工具](https://miaojuanfeng.gitbooks.io/idebug-php/content)
